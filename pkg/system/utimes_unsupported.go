@@ -3,9 +3,13 @@
 
 package system
 
-import "syscall"
+import (
+	"syscall"
+
+	errsys "github.com/bhojpur/errors/pkg/system"
+)
 
 // LUtimesNano is only supported on linux and freebsd.
 func LUtimesNano(path string, ts []syscall.Timespec) error {
-	return ErrNotSupportedPlatform
+	return errsys.ErrNotSupportedPlatform
 }
