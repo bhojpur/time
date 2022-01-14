@@ -1,7 +1,4 @@
-//go:build !linux && !freebsd
-// +build !linux,!freebsd
-
-package system
+package timer
 
 // Copyright (c) 2018 Bhojpur Consulting Private Limited, India. All rights reserved.
 
@@ -24,12 +21,27 @@ package system
 // THE SOFTWARE.
 
 import (
-	"syscall"
+	"context"
+	"testing"
+	"time"
 
-	errsys "github.com/bhojpur/errors/pkg/system"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// LUtimesNano is only supported on linux and freebsd.
-func LUtimesNano(path string, ts []syscall.Timespec) error {
-	return errsys.ErrNotSupportedPlatform
+func TestSleepContext(t *testing.T) {
+	ctx := context.Background()
+	start := time.Now()
+	err := SleepContext(ctx, 10*time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, time.Since(start) > 10*time.Millisecond, time.Since(start))
+	assert.True(t, time.Since(start) < 100*time.Millisecond, time.Since(start))
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer cancel()
+	start = time.Now()
+	err = SleepContext(ctx, 100*time.Millisecond)
+	require.Error(t, err)
+	assert.True(t, time.Since(start) > 10*time.Millisecond, time.Since(start))
+	assert.True(t, time.Since(start) < 100*time.Millisecond, time.Since(start))
 }

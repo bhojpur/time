@@ -1,4 +1,4 @@
-package system
+package sync2
 
 // Copyright (c) 2018 Bhojpur Consulting Private Limited, India. All rights reserved.
 
@@ -21,26 +21,63 @@ package system
 // THE SOFTWARE.
 
 import (
+	"context"
+	"testing"
 	"time"
 
-	"golang.org/x/sys/windows"
+	"github.com/stretchr/testify/assert"
 )
 
-// setCTime will set the create time on a file. On Windows, this requires
-// calling SetFileTime and explicitly including the create time.
-func setCTime(path string, ctime time.Time) error {
-	ctimespec := windows.NsecToTimespec(ctime.UnixNano())
-	pathp, e := windows.UTF16PtrFromString(path)
-	if e != nil {
-		return e
-	}
-	h, e := windows.CreateFile(pathp,
-		windows.FILE_WRITE_ATTRIBUTES, windows.FILE_SHARE_WRITE, nil,
-		windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
-	if e != nil {
-		return e
-	}
-	defer windows.Close(h)
-	c := windows.NsecToFiletime(windows.TimespecToNsec(ctimespec))
-	return windows.SetFileTime(h, &c, nil, nil)
+func TestSemaNoTimeout(t *testing.T) {
+	s := NewSemaphore(1, 0)
+	s.Acquire()
+	released := false
+	go func() {
+		released = true
+		s.Release()
+	}()
+	s.Acquire()
+	assert.True(t, released)
+}
+
+func TestSemaTimeout(t *testing.T) {
+	s := NewSemaphore(1, 1*time.Millisecond)
+	s.Acquire()
+	release := make(chan struct{})
+	released := make(chan struct{})
+	go func() {
+		<-release
+		s.Release()
+		released <- struct{}{}
+	}()
+	assert.False(t, s.Acquire())
+	release <- struct{}{}
+	<-released
+	assert.True(t, s.Acquire())
+}
+
+func TestSemaAcquireContext(t *testing.T) {
+	s := NewSemaphore(1, 0)
+	s.Acquire()
+	release := make(chan struct{})
+	released := make(chan struct{})
+	go func() {
+		<-release
+		s.Release()
+		released <- struct{}{}
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	assert.False(t, s.AcquireContext(ctx))
+	release <- struct{}{}
+	<-released
+	assert.True(t, s.AcquireContext(context.Background()))
+}
+
+func TestSemaTryAcquire(t *testing.T) {
+	s := NewSemaphore(1, 0)
+	assert.True(t, s.TryAcquire())
+	assert.False(t, s.TryAcquire())
+	s.Release()
+	assert.True(t, s.TryAcquire())
 }

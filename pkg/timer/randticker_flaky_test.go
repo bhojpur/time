@@ -1,7 +1,4 @@
-//go:build !linux && !freebsd
-// +build !linux,!freebsd
-
-package system
+package timer
 
 // Copyright (c) 2018 Bhojpur Consulting Private Limited, India. All rights reserved.
 
@@ -24,12 +21,47 @@ package system
 // THE SOFTWARE.
 
 import (
-	"syscall"
-
-	errsys "github.com/bhojpur/errors/pkg/system"
+	"testing"
+	"time"
 )
 
-// LUtimesNano is only supported on linux and freebsd.
-func LUtimesNano(path string, ts []syscall.Timespec) error {
-	return errsys.ErrNotSupportedPlatform
+const (
+	testDuration = 100 * time.Millisecond
+	testVariance = 20 * time.Millisecond
+)
+
+func TestTick(t *testing.T) {
+	tkr := NewRandTicker(testDuration, testVariance)
+	for i := 0; i < 5; i++ {
+		start := time.Now()
+		end := <-tkr.C
+		diff := start.Add(testDuration).Sub(end)
+		tolerance := testVariance + 20*time.Millisecond
+		if diff < -tolerance || diff > tolerance {
+			t.Errorf("start: %v, end: %v, diff %v. Want <%v tolerenace", start, end, diff, tolerance)
+		}
+	}
+	tkr.Stop()
+	_, ok := <-tkr.C
+	if ok {
+		t.Error("Channel was not closed")
+	}
+}
+
+func TestTickSkip(t *testing.T) {
+	tkr := NewRandTicker(10*time.Millisecond, 1*time.Millisecond)
+	time.Sleep(35 * time.Millisecond)
+	end := <-tkr.C
+	diff := time.Since(end)
+	if diff < 20*time.Millisecond {
+		t.Errorf("diff: %v, want >20ms", diff)
+	}
+
+	// This tick should be up-to-date
+	end = <-tkr.C
+	diff = time.Since(end)
+	if diff > 1*time.Millisecond {
+		t.Errorf("diff: %v, want <1ms", diff)
+	}
+	tkr.Stop()
 }

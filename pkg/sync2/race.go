@@ -1,7 +1,7 @@
-//go:build !linux && !freebsd
-// +build !linux,!freebsd
+//go:build race
+// +build race
 
-package system
+package sync2
 
 // Copyright (c) 2018 Bhojpur Consulting Private Limited, India. All rights reserved.
 
@@ -23,13 +23,5 @@ package system
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import (
-	"syscall"
-
-	errsys "github.com/bhojpur/errors/pkg/system"
-)
-
-// LUtimesNano is only supported on linux and freebsd.
-func LUtimesNano(path string, ts []syscall.Timespec) error {
-	return errsys.ErrNotSupportedPlatform
-}
+// Race reports if the race detector is enabled.
+const Race = true

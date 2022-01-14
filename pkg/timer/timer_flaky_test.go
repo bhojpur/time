@@ -1,4 +1,4 @@
-package system
+package timer
 
 // Copyright (c) 2018 Bhojpur Consulting Private Limited, India. All rights reserved.
 
@@ -21,26 +21,61 @@ package system
 // THE SOFTWARE.
 
 import (
+	"testing"
 	"time"
 
-	"golang.org/x/sys/windows"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/bhojpur/time/pkg/sync2"
 )
 
-// setCTime will set the create time on a file. On Windows, this requires
-// calling SetFileTime and explicitly including the create time.
-func setCTime(path string, ctime time.Time) error {
-	ctimespec := windows.NsecToTimespec(ctime.UnixNano())
-	pathp, e := windows.UTF16PtrFromString(path)
-	if e != nil {
-		return e
-	}
-	h, e := windows.CreateFile(pathp,
-		windows.FILE_WRITE_ATTRIBUTES, windows.FILE_SHARE_WRITE, nil,
-		windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
-	if e != nil {
-		return e
-	}
-	defer windows.Close(h)
-	c := windows.NsecToFiletime(windows.TimespecToNsec(ctimespec))
-	return windows.SetFileTime(h, &c, nil, nil)
+const (
+	half    = 50 * time.Millisecond
+	quarter = 25 * time.Millisecond
+	tenth   = 10 * time.Millisecond
+)
+
+var numcalls sync2.AtomicInt64
+
+func f() {
+	numcalls.Add(1)
+}
+
+func TestWait(t *testing.T) {
+	numcalls.Set(0)
+	timer := NewTimer(quarter)
+	assert.False(t, timer.Running())
+	timer.Start(f)
+	defer timer.Stop()
+	assert.True(t, timer.Running())
+	time.Sleep(tenth)
+	assert.Equal(t, int64(0), numcalls.Get())
+	time.Sleep(quarter)
+	assert.Equal(t, int64(1), numcalls.Get())
+	time.Sleep(quarter)
+	assert.Equal(t, int64(2), numcalls.Get())
+}
+
+func TestReset(t *testing.T) {
+	numcalls.Set(0)
+	timer := NewTimer(half)
+	timer.Start(f)
+	defer timer.Stop()
+	timer.SetInterval(quarter)
+	time.Sleep(tenth)
+	assert.Equal(t, int64(0), numcalls.Get())
+	time.Sleep(quarter)
+	assert.Equal(t, int64(1), numcalls.Get())
+}
+
+func TestIndefinite(t *testing.T) {
+	numcalls.Set(0)
+	timer := NewTimer(0)
+	timer.Start(f)
+	defer timer.Stop()
+	timer.TriggerAfter(quarter)
+	time.Sleep(tenth)
+	assert.Equal(t, int64(0), numcalls.Get())
+	time.Sleep(quarter)
+	assert.Equal(t, int64(1), numcalls.Get())
 }
