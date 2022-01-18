@@ -3,7 +3,7 @@ module github.com/bhojpur/time
 go 1.17
 
 require (
-	github.com/bhojpur/cache v0.0.1
+	github.com/bhojpur/cache v0.0.2
 	github.com/bhojpur/errors v0.0.2
 	github.com/lib/pq v1.10.4
 	github.com/sirupsen/logrus v1.8.1
